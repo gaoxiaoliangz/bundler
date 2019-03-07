@@ -7,7 +7,7 @@ const code = `
 import a from './a'
 
 function square(n) {
-  return n * n;
+  return n * n
 }
 
 export default square
@@ -23,18 +23,27 @@ const processModule = moduleCode => {
 
   traverse(ast, {
     ImportDeclaration(path, stats) {
-      imports[path.node.source.value] = {
-        default: path.node.specifiers[0].local.name,
+      const varName = path.node.specifiers[0].local.name
+      const relPath = path.node.source.value
+      imports[relPath] = {
+        default: varName,
       }
-      path.remove()
+      const importNode = babel.template.statement
+        .ast`var ${varName} = require('${relPath}')`
+      path.replaceWith(importNode)
     },
     ExportDefaultDeclaration(path, stats) {
-      moduleExports['default'] = path.node.declaration.name
-      path.remove()
+      // TODO: 暂时简单处理，明显这边还可以是其他的形式
+      const defaultVarName = path.node.declaration.name
+      moduleExports['default'] = defaultVarName
+      const importNode = babel.template.statement
+        .ast`exports.default = ${defaultVarName}`
+      path.replaceWith(importNode)
     },
   })
 
   const { code: codeOutput } = babel.transformFromAstSync(ast)
+  console.log(codeOutput)
   return codeOutput
 }
 
