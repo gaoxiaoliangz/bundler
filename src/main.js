@@ -3,20 +3,39 @@ import * as parser from '@babel/parser'
 import traverse from '@babel/traverse'
 import * as babel from '@babel/core'
 
-const code = `function square(n) {
+const code = `
+import a from './a'
+
+function square(n) {
   return n * n;
-}`
+}
 
-const ast = parser.parse(code)
+export default square
+`
 
-traverse(ast, {
-  enter(path) {
-    if (path.isIdentifier({ name: 'n' })) {
-      path.node.name = 'x'
-    }
-  },
-})
+const processModule = moduleCode => {
+  const imports = {}
+  const moduleExports = {}
 
-const { code: codeOutput } = babel.transformFromAstSync(ast)
+  const ast = parser.parse(moduleCode, {
+    sourceType: 'module',
+  })
 
-console.log(codeOutput)
+  traverse(ast, {
+    ImportDeclaration(path, stats) {
+      imports[path.node.source.value] = {
+        default: path.node.specifiers[0].local.name,
+      }
+      path.remove()
+    },
+    ExportDefaultDeclaration(path, stats) {
+      moduleExports['default'] = path.node.declaration.name
+      path.remove()
+    },
+  })
+
+  const { code: codeOutput } = babel.transformFromAstSync(ast)
+  return codeOutput
+}
+
+processModule(code)

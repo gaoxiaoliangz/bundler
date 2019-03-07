@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": ["src/**/*.spec.js"],
+  "exec": "node --inspect-brk src/index.js"
+}
