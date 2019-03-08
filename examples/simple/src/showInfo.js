@@ -1,7 +1,7 @@
-import add from './add'
+import utils from './utils/index'
 
 const showInfo = msg => {
-  console.log(add('prefix', msg))
+  console.log(utils.add('prefix', msg))
 }
 
 export default showInfo

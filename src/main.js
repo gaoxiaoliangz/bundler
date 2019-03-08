@@ -56,6 +56,10 @@ const wrapModule = code => {
 }`
 }
 
+const resolveRelPath = (relPath, currentPath) => {
+  return path.resolve(currentPath, '../', relPath)
+}
+
 const compile = () => {
   const config = getConfig()
   const { entry, output } = config
@@ -79,16 +83,12 @@ const compile = () => {
     const currentId = ++moduleId
     modules[filePath] = {
       id: currentId,
-      code: wrapModule(transformModule(rawModuleCode)),
+      code: wrapModule(transformModule(rawModuleCode, filePath)),
     }
     return currentId
   }
 
-  const resolveRelPath = relPath => {
-    return path.resolve(entry, '../', relPath)
-  }
-
-  const transformModule = moduleCode => {
+  const transformModule = (moduleCode, currentPath) => {
     const ast = parser.parse(moduleCode, {
       sourceType: 'module',
     })
@@ -98,7 +98,9 @@ const compile = () => {
         const varName = path.node.specifiers[0].local.name
         const relPath = path.node.source.value
         // TODO: ext 处理
-        const moduleId = resolveImport(resolveRelPath(relPath + '.js'))
+        const moduleId = resolveImport(
+          resolveRelPath(relPath + '.js', currentPath)
+        )
         const code = `var ${varName} = __requireESModule(${moduleId}).default`
         const importNode = babel.template.statement.ast`${code}`
         path.replaceWith(importNode)
