@@ -76,12 +76,12 @@ const compile = () => {
       return modules[filePath].id
     }
     const rawModuleCode = readCodeFile(filePath)
-    moduleId++
+    const currentId = ++moduleId
     modules[filePath] = {
-      id: moduleId,
+      id: currentId,
       code: wrapModule(transformModule(rawModuleCode)),
     }
-    return moduleId
+    return currentId
   }
 
   const resolveRelPath = relPath => {
