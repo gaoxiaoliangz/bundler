@@ -4,6 +4,7 @@ import traverse from '@babel/traverse'
 import * as babel from '@babel/core'
 import * as path from 'path'
 import * as fs from 'fs'
+import generate from '@babel/generator'
 
 const getConfig = () => {
   const defaultConfigFile = 'mywebpack.config.js'
@@ -92,25 +93,55 @@ const compile = () => {
     const ast = parser.parse(moduleCode, {
       sourceType: 'module',
     })
+    const makeExport = (local, exported = 'default') =>
+      `__esModuleExports.${exported} = ${local}`
+    const makeImport = (local, imported, _moduleId) => {
+      return `var ${local} = __requireESModule(${_moduleId}).${imported ||
+        'default'}`
+    }
+    const replaceWithCode = (path, code) => {
+      const node = babel.template.statement.ast`${code}`
+      path.replaceWith(node)
+    }
 
     traverse(ast, {
       ImportDeclaration(path, stats) {
-        const varName = path.node.specifiers[0].local.name
         const relPath = path.node.source.value
         // TODO: ext 处理
-        const moduleId = resolveImport(
+        const _moduleId = resolveImport(
           resolveRelPath(relPath + '.js', currentPath)
         )
-        const code = `var ${varName} = __requireESModule(${moduleId}).default`
-        const importNode = babel.template.statement.ast`${code}`
-        path.replaceWith(importNode)
+        const imports = path.node.specifiers
+          .map(s => {
+            return makeImport(
+              s.local.name,
+              s.imported && s.imported.name,
+              _moduleId
+            )
+          })
+          .join(';\n')
+        replaceWithCode(path, imports)
       },
       ExportDefaultDeclaration(path, stats) {
-        // TODO: 暂时简单处理，明显这边还可以是其他的形式
-        const defaultVarName = path.node.declaration.name
-        const importNode = babel.template.statement
-          .ast`__esModuleExports.default = ${defaultVarName}`
-        path.replaceWith(importNode)
+        if (path.node.declaration.type === 'Identifier') {
+          const defaultVarName = path.node.declaration.name
+          const importNode = babel.template.statement.ast`${makeExport(
+            defaultVarName
+          )}`
+          path.replaceWith(importNode)
+        } else {
+          const { code: rCode } = generate(path.node.declaration)
+          const code = makeExport(rCode)
+          replaceWithCode(path, code)
+        }
+      },
+      ExportNamedDeclaration(path, stats) {
+        const _exports = path.node.specifiers
+          .map(s => {
+            return makeExport(s.local.name, s.exported.name)
+          })
+          .join(';\n')
+        replaceWithCode(path, _exports)
       },
     })
 

@@ -1,7 +1,9 @@
-import utils from './utils/index'
+import { add } from './utils/index'
+import log from './utils/log'
 
-const showInfo = msg => {
-  document.body.innerHTML = `<h1>${utils.add('Hi', msg)}</h1>`
+const showInfo = (msg, tag = 'div') => {
+  document.body.innerHTML += `<${tag}>${add('Hi', msg)}</${tag}>`
+  log('working')
 }
 
 export default showInfo
