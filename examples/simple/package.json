@@ -1,0 +1,10 @@
+{
+  "name": "simple",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "mywebpack",
+    "debug": "node --inspect-brk ../../src/index.js"
+  },
+  "main": "index.js",
+  "license": "MIT"
+}

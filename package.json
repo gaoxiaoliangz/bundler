@@ -6,6 +6,9 @@
     "debug": "node --inspect-brk src/index.js",
     "nodemon": "nodemon --config nodemon-debug.json"
   },
+  "bin": {
+    "mywebpack": "src/index.js"
+  },
   "main": "index.js",
   "repository": "git@github.com:gaoxiaoliangz/build-my-webpack.git",
   "author": "gaoxiaoliangz <gaoxiaoliangz@gmail.com>",
