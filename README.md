@@ -4,6 +4,12 @@
 
 Just being curious.
 
+## Implemented features
+
+- default import and export are supported (named import & export not implemented)
+- `.js` module is supported (loader system not implemented, `node_modules` not supported)
+- the ability to use `mywebpack.config.js` to customize `entry` and `output` path
+
 ## How to run
 
 ```
