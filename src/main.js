@@ -92,6 +92,7 @@ const compile = () => {
   const transformModule = (moduleCode, currentPath) => {
     const ast = parser.parse(moduleCode, {
       sourceType: 'module',
+      plugins: ['dynamicImport'],
     })
     const makeExport = (local, exported = 'default') =>
       `__esModuleExports.${exported} = ${local}`
@@ -105,6 +106,24 @@ const compile = () => {
     }
 
     traverse(ast, {
+      // find import()
+      ExpressionStatement(path) {
+        path.traverse({
+          CallExpression(path) {
+            path.traverse({
+              MemberExpression(path) {
+                path.traverse({
+                  CallExpression(path) {
+                    if (path.node.callee.type === 'Import') {
+                      console.log(path.node.arguments[0].value)
+                    }
+                  },
+                })
+              },
+            })
+          },
+        })
+      },
       ImportDeclaration(path, stats) {
         const relPath = path.node.source.value
         // TODO: ext 处理
