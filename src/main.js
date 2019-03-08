@@ -42,6 +42,7 @@ const processModule = moduleCode => {
     },
   })
 
+  // @ts-ignore
   const { code: codeOutput } = babel.transformFromAstSync(ast)
   console.log(codeOutput)
   return codeOutput

@@ -2,8 +2,9 @@
   "name": "build-my-webpack",
   "version": "1.0.0",
   "scripts": {
-    "start": "nodemon --config nodemon-debug.json",
-    "debug": "node --inspect-brk src/index.js"
+    "start": "node src/index.js",
+    "debug": "node --inspect-brk src/index.js",
+    "nodemon": "nodemon --config nodemon-debug.json"
   },
   "main": "index.js",
   "repository": "git@github.com:gaoxiaoliangz/build-my-webpack.git",
