@@ -2,16 +2,37 @@
 import * as parser from '@babel/parser'
 import traverse from '@babel/traverse'
 import * as babel from '@babel/core'
+import * as path from 'path'
+import * as fs from 'fs'
 
-const code = `
-import a from './a'
-
-function square(n) {
-  return n * n
+const getConfig = () => {
+  const defaultConfigFile = 'mywebpack.config.js'
+  const workingDir = process.cwd()
+  const configFilePath = path.resolve(workingDir, defaultConfigFile)
+  if (!fs.existsSync(configFilePath)) {
+    throw new Error(`${defaultConfigFile} doesn't exist!`)
+  }
+  return require(configFilePath)
 }
 
-export default square
-`
+const readCodeFile = filePath =>
+  fs.readFileSync(filePath, {
+    encoding: 'utf8',
+  })
+
+const writeCodeToDisk = (filePath, code) => {
+  fs.writeFileSync(filePath, code, {
+    encoding: 'utf8',
+  })
+}
+
+const compile = () => {
+  const config = getConfig()
+  const { entry, output } = config
+  const entryFileCode = readCodeFile(entry)
+  const code = processModule(entryFileCode)
+  writeCodeToDisk(path.resolve(output, './bundle.js'), code)
+}
 
 const processModule = moduleCode => {
   const imports = {}
@@ -48,4 +69,4 @@ const processModule = moduleCode => {
   return codeOutput
 }
 
-processModule(code)
+compile()
