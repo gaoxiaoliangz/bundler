@@ -26,12 +26,25 @@ const writeCodeToDisk = (filePath, code) => {
   })
 }
 
+const codeTpl = modules => {
+  return `
+(function() {
+  function require(id) {
+    return {}
+  }
+  ${modules}
+})()
+`
+}
+
 const compile = () => {
   const config = getConfig()
   const { entry, output } = config
   const entryFileCode = readCodeFile(entry)
   const code = processModule(entryFileCode)
-  writeCodeToDisk(path.resolve(output, './bundle.js'), code)
+  const codeWithWrap = codeTpl(code)
+  writeCodeToDisk(path.resolve(output, './bundle.js'), codeWithWrap)
+  console.log('Build complete 🌟')
 }
 
 const processModule = moduleCode => {
@@ -65,7 +78,6 @@ const processModule = moduleCode => {
 
   // @ts-ignore
   const { code: codeOutput } = babel.transformFromAstSync(ast)
-  console.log(codeOutput)
   return codeOutput
 }
 
