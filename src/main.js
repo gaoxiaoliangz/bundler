@@ -130,12 +130,20 @@ const compile = () => {
           )}`
           path.replaceWith(importNode)
         } else {
-          const { code: rCode } = generate(path.node.declaration)
-          const code = makeExport(rCode)
-          replaceWithCode(path, code)
+          const { code } = generate(path.node.declaration)
+          const exportCode = makeExport(code)
+          replaceWithCode(path, exportCode)
         }
       },
       ExportNamedDeclaration(path, stats) {
+        if (path.node.declaration) {
+          const { code } = generate(path.node.declaration)
+          const local = path.node.declaration.declarations[0].id.name
+          const exportCode = code + '\n' + makeExport(local, local)
+          replaceWithCode(path, exportCode)
+          return
+        }
+        // TODO: 这里情况还有这种 export function a() {}
         const _exports = path.node.specifiers
           .map(s => {
             return makeExport(s.local.name, s.exported.name)
