@@ -27,58 +27,100 @@ const writeCodeToDisk = (filePath, code) => {
 }
 
 const codeTpl = modules => {
-  return `
-(function() {
-  function require(id) {
-    return {}
+  const modulesCode = Object.keys(modules)
+    .map(key => {
+      const _module = modules[key]
+      return `${_module.id}: ${_module.code}`
+    })
+    .join(',\n')
+
+  return `;(function(modules) {
+  var cache = {}
+  function requireESModule(id) {
+    if (cache[id]) {
+      return cache[id]
+    }
+    var esModule = modules[id]
+    var esModuleExports = {}
+    esModule(requireESModule, esModuleExports)
+    cache[id] = esModuleExports
+    return esModuleExports
   }
-  ${modules}
-})()
-`
+  modules[0](requireESModule, {})
+})({${modulesCode}})`
+}
+
+const wrapModule = code => {
+  return `function(__requireESModule, __esModuleExports) {
+  ${code}
+}`
 }
 
 const compile = () => {
   const config = getConfig()
   const { entry, output } = config
-  const entryFileCode = readCodeFile(entry)
-  const code = processModule(entryFileCode)
-  const codeWithWrap = codeTpl(code)
-  writeCodeToDisk(path.resolve(output, './bundle.js'), codeWithWrap)
+  /**
+   * module {
+   *   id: number
+   *   code: string
+   * }
+   * {
+   *   [filePath: string]: module
+   * }
+   */
+  const modules = {}
+  let moduleId = -1
+
+  const resolveImport = filePath => {
+    if (modules[filePath]) {
+      return modules[filePath].id
+    }
+    const rawModuleCode = readCodeFile(filePath)
+    moduleId++
+    modules[filePath] = {
+      id: moduleId,
+      code: wrapModule(transformModule(rawModuleCode)),
+    }
+    return moduleId
+  }
+
+  const resolveRelPath = relPath => {
+    return path.resolve(entry, '../', relPath)
+  }
+
+  const transformModule = moduleCode => {
+    const ast = parser.parse(moduleCode, {
+      sourceType: 'module',
+    })
+
+    traverse(ast, {
+      ImportDeclaration(path, stats) {
+        const varName = path.node.specifiers[0].local.name
+        const relPath = path.node.source.value
+        // TODO: ext 处理
+        const moduleId = resolveImport(resolveRelPath(relPath + '.js'))
+        const code = `var ${varName} = __requireESModule(${moduleId}).default`
+        const importNode = babel.template.statement.ast`${code}`
+        path.replaceWith(importNode)
+      },
+      ExportDefaultDeclaration(path, stats) {
+        // TODO: 暂时简单处理，明显这边还可以是其他的形式
+        const defaultVarName = path.node.declaration.name
+        const importNode = babel.template.statement
+          .ast`__esModuleExports.default = ${defaultVarName}`
+        path.replaceWith(importNode)
+      },
+    })
+
+    // @ts-ignore
+    const { code: codeOutput } = babel.transformFromAstSync(ast)
+    return codeOutput
+  }
+
+  resolveImport(entry)
+  const finalCode = codeTpl(modules)
+  writeCodeToDisk(path.resolve(output, './bundle.js'), finalCode)
   console.log('Build complete 🌟')
-}
-
-const processModule = moduleCode => {
-  const imports = {}
-  const moduleExports = {}
-
-  const ast = parser.parse(moduleCode, {
-    sourceType: 'module',
-  })
-
-  traverse(ast, {
-    ImportDeclaration(path, stats) {
-      const varName = path.node.specifiers[0].local.name
-      const relPath = path.node.source.value
-      imports[relPath] = {
-        default: varName,
-      }
-      const importNode = babel.template.statement
-        .ast`var ${varName} = require('${relPath}')`
-      path.replaceWith(importNode)
-    },
-    ExportDefaultDeclaration(path, stats) {
-      // TODO: 暂时简单处理，明显这边还可以是其他的形式
-      const defaultVarName = path.node.declaration.name
-      moduleExports['default'] = defaultVarName
-      const importNode = babel.template.statement
-        .ast`exports.default = ${defaultVarName}`
-      path.replaceWith(importNode)
-    },
-  })
-
-  // @ts-ignore
-  const { code: codeOutput } = babel.transformFromAstSync(ast)
-  return codeOutput
 }
 
 compile()
