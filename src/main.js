@@ -5,6 +5,7 @@ import * as babel from '@babel/core'
 import * as path from 'path'
 import * as fs from 'fs'
 import generate from '@babel/generator'
+import md5 from 'md5'
 
 const getConfig = () => {
   const defaultConfigFile = 'mywebpack.config.js'
@@ -61,9 +62,7 @@ const resolveRelPath = (relPath, currentPath) => {
   return path.resolve(currentPath, '../', relPath)
 }
 
-const compile = () => {
-  const config = getConfig()
-  const { entry, output } = config
+const compileBundle = (entry, output) => {
   /**
    * module {
    *   id: number
@@ -115,7 +114,16 @@ const compile = () => {
                 path.traverse({
                   CallExpression(path) {
                     if (path.node.callee.type === 'Import') {
-                      console.log(path.node.arguments[0].value)
+                      const relPath = path.node.arguments[0].value
+                      const absPath = resolveRelPath(
+                        relPath + '.js',
+                        currentPath
+                      )
+                      const builtFilePath = compileBundle(absPath, {
+                        path: output.path,
+                        publicPath: output.publicPath,
+                      })
+                      path.node.arguments[0].value = builtFilePath
                     }
                   },
                 })
@@ -179,7 +187,18 @@ const compile = () => {
 
   resolveImport(entry)
   const finalCode = codeTpl(modules)
-  writeCodeToDisk(path.resolve(output, './bundle.js'), finalCode)
+  const fileHash = md5(finalCode)
+  const filename = output.filename || fileHash + '.js'
+  const outputFilePath = path.resolve(output.path, filename)
+  writeCodeToDisk(outputFilePath, finalCode)
+  console.log(`Bundled ${entry}`)
+  return `${output.publicPath}/${filename}`
+}
+
+const compile = () => {
+  const config = getConfig()
+  const { entry, output } = config
+  compileBundle(entry, output)
   console.log('Build complete 🌟')
 }
 
