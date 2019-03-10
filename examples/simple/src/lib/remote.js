@@ -1,3 +1,5 @@
+import log from '../utils/log'
+
 export const test = () => {
-  console.log('from remote')
+  log('from remote')
 }

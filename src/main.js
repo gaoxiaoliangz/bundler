@@ -36,20 +36,29 @@ const codeTpl = modules => {
     })
     .join(',\n')
 
-  return `;(function(modules) {
-  var cache = {}
-  function requireESModule(id) {
-    if (cache[id]) {
-      return cache[id]
-    }
-    var esModule = modules[id]
-    var esModuleExports = {}
-    esModule(requireESModule, esModuleExports)
-    cache[id] = esModuleExports
-    return esModuleExports
+  return `;(function() {
+  function __dynamicImport(url) {
+    return fetch(url).then(res => {
+      return res.text().then(data => {
+        return eval(data)
+      })
+    })
   }
-  modules[0](requireESModule, {})
-})({${modulesCode}})`
+  return (function(modules) {
+    var cache = {}
+    function requireESModule(id) {
+      if (cache[id]) {
+        return cache[id]
+      }
+      var esModule = modules[id]
+      var esModuleExports = {}
+      esModule(requireESModule, esModuleExports)
+      cache[id] = esModuleExports
+      return esModuleExports
+    }
+    return requireESModule(0)
+  })({${modulesCode}})
+})()`
 }
 
 const wrapModule = code => {
@@ -114,6 +123,8 @@ const compileBundle = (entry, output) => {
                 path.traverse({
                   CallExpression(path) {
                     if (path.node.callee.type === 'Import') {
+                      path.node.callee.type = 'Identifier'
+                      path.node.callee.name = '__dynamicImport'
                       const relPath = path.node.arguments[0].value
                       const absPath = resolveRelPath(
                         relPath + '.js',
@@ -190,6 +201,9 @@ const compileBundle = (entry, output) => {
   const fileHash = md5(finalCode)
   const filename = output.filename || fileHash + '.js'
   const outputFilePath = path.resolve(output.path, filename)
+  if (!fs.existsSync(output.path)) {
+    fs.mkdirSync(output.path)
+  }
   writeCodeToDisk(outputFilePath, finalCode)
   console.log(`Bundled ${entry}`)
   return `${output.publicPath}/${filename}`
