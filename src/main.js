@@ -222,12 +222,24 @@ const compileBundle = ({
       ExportNamedDeclaration(path, stats) {
         if (path.node.declaration) {
           const { code } = generate(path.node.declaration)
-          const local = path.node.declaration.declarations[0].id.name
-          const exportCode = code + '\n' + makeExport(local, local)
-          replaceWithCode(path, exportCode)
+          const handleDecl = d => {
+            const local = d.id.name
+            return makeExport(local, local)
+          }
+          if (path.node.declaration.type === 'FunctionDeclaration') {
+            replaceWithCode(
+              path,
+              code + '\n' + handleDecl(path.node.declaration)
+            )
+            return
+          }
+          let exportCode = ''
+          path.node.declaration.declarations.forEach(d => {
+            exportCode += handleDecl(d) + '\n'
+          })
+          replaceWithCode(path, code + '\n' + exportCode)
           return
         }
-        // TODO: 这里情况还有这种 export function a() {}
         const _exports = path.node.specifiers
           .map(s => {
             return makeExport(s.local.name, s.exported.name)
