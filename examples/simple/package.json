@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "scripts": {
     "start": "serve",
+    "prebuild": "rimraf dist",
     "build": "mywebpack",
     "debug": "node --inspect-brk ../../src/index.js"
   },
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
+    "rimraf": "^2.6.3",
     "serve": "^10.1.2"
   }
 }
