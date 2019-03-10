@@ -71,7 +71,13 @@ const resolveRelPath = (relPath, currentPath) => {
   return path.resolve(currentPath, '../', relPath)
 }
 
-const compileBundle = (entry, output) => {
+const compileBundle = ({
+  entry,
+  output,
+  compiledBundles,
+  onFinishCompilingBundle,
+  isAppBundle,
+}) => {
   /**
    * module {
    *   id: number
@@ -130,11 +136,22 @@ const compileBundle = (entry, output) => {
                         relPath + '.js',
                         currentPath
                       )
-                      const builtFilePath = compileBundle(absPath, {
-                        path: output.path,
-                        publicPath: output.publicPath,
+                      if (compiledBundles[absPath]) {
+                        path.node.arguments[0].value =
+                          compiledBundles[absPath].publicFilePath
+                        return
+                      }
+                      const publicFilePath = compileBundle({
+                        entry: absPath,
+                        output: {
+                          path: output.path,
+                          publicPath: output.publicPath,
+                        },
+                        onFinishCompilingBundle,
+                        compiledBundles,
+                        isAppBundle: false,
                       })
-                      path.node.arguments[0].value = builtFilePath
+                      path.node.arguments[0].value = publicFilePath
                     }
                   },
                 })
@@ -199,20 +216,65 @@ const compileBundle = (entry, output) => {
   resolveImport(entry)
   const finalCode = codeTpl(modules)
   const fileHash = md5(finalCode)
-  const filename = output.filename || fileHash + '.js'
+  let publicFilePath
+  let filename
+
+  if (isAppBundle) {
+    // TODO: 处理 hash
+    filename = output.filename || fileHash + '.js'
+    publicFilePath = `${output.publicPath}/${filename}`
+  } else {
+    // dynamic import
+    const {
+      publicFilePath: publicFilePath0,
+      filename: filename0,
+    } = onFinishCompilingBundle(entry)
+    filename = filename0
+    publicFilePath = publicFilePath0
+  }
   const outputFilePath = path.resolve(output.path, filename)
+
   if (!fs.existsSync(output.path)) {
     fs.mkdirSync(output.path)
   }
   writeCodeToDisk(outputFilePath, finalCode)
   console.log(`Bundled ${entry}`)
-  return `${output.publicPath}/${filename}`
+  return publicFilePath
 }
 
 const compile = () => {
   const config = getConfig()
+  let bundleId = 0
   const { entry, output } = config
-  compileBundle(entry, output)
+  /**
+   * {
+   *    [entryFilePath: string]: {
+   *        id,
+   *        publicFilePath,
+   *    }
+   * }
+   */
+  const compiledBundles = {}
+  const onFinishCompilingBundle = filePath => {
+    const id = bundleId
+    const filename = `${id}.chunk.js`
+    const publicFilePath = `${output.publicPath}/${filename}`
+    const bundleInfo = {
+      id,
+      publicFilePath,
+      filename,
+    }
+    bundleId++
+    compiledBundles[filePath] = bundleInfo
+    return bundleInfo
+  }
+  compileBundle({
+    entry,
+    output,
+    compiledBundles,
+    onFinishCompilingBundle,
+    isAppBundle: true,
+  })
   console.log('Build complete 🌟')
 }
 

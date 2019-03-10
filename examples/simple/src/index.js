@@ -7,6 +7,12 @@ const app = () => {
   import('./lib/remote').then(m => {
     m.test()
   })
+  import('./lib/remote').then(m => {
+    m.test()
+  })
+  import('./lib/remote2').then(m => {
+    m.test2()
+  })
 }
 
 app()
