@@ -1,3 +1,5 @@
-export default msg => {
-  console.log('from log.js', msg)
+export default (...msg) => {
+  const t = new Date()
+  const s = `${t.getHours()}:${t.getMinutes()}:${t.getSeconds()} `
+  console.log(s, ...msg)
 }

@@ -5,6 +5,7 @@ import * as babel from '@babel/core'
 import * as path from 'path'
 import * as fs from 'fs'
 import generate from '@babel/generator'
+import md5 from 'md5'
 
 const getConfig = () => {
   const defaultConfigFile = 'mywebpack.config.js'
@@ -35,35 +36,71 @@ const codeTpl = modules => {
     })
     .join(',\n')
 
-  return `;(function(modules) {
-  var cache = {}
-  function requireESModule(id) {
-    if (cache[id]) {
-      return cache[id]
+  return `;(function() {
+  var __dynamicImport = (function() {
+    var cache = {}
+    return function (url) {
+      const hit = cache[url]
+      if (hit) {
+        if(!hit.isFetching) {
+          return Promise.resolve(cache[url].exports)
+        } else {
+          return hit.fetchPromise
+        }
+      }
+      const fetchPromise = fetch(url).then(res => {
+        return res.text().then(data => {
+          const result = eval(data)
+          cache[url] = {
+            exports: result,
+            isFetching: false,
+          }
+          return result
+        })
+      })
+      cache[url] = {
+        fetchPromise,
+        isFetching: true,
+        exports: null,
+      }
+      return fetchPromise
     }
-    var esModule = modules[id]
-    var esModuleExports = {}
-    esModule(requireESModule, esModuleExports)
-    cache[id] = esModuleExports
-    return esModuleExports
-  }
-  modules[0](requireESModule, {})
-})({${modulesCode}})`
+  })()
+  return (function(modules) {
+    var cache = {}
+    function requireESModule(id) {
+      if (cache[id]) {
+        return cache[id]
+      }
+      var esModule = modules[id]
+      var esModuleExports = {}
+      esModule(requireESModule, esModuleExports)
+      cache[id] = esModuleExports
+      return esModuleExports
+    }
+    return requireESModule(0)
+  })({${modulesCode}})
+})()`
 }
 
-const wrapModule = code => {
-  return `function(__requireESModule, __esModuleExports) {
-  ${code}
-}`
+const wrapModule = (code, filePath) => {
+  return `// ${filePath}
+  function(__requireESModule, __esModuleExports) {
+    ${code}
+  }`
 }
 
 const resolveRelPath = (relPath, currentPath) => {
   return path.resolve(currentPath, '../', relPath)
 }
 
-const compile = () => {
-  const config = getConfig()
-  const { entry, output } = config
+const compileBundle = ({
+  entry,
+  output,
+  compiledBundles,
+  onFinishCompilingBundle,
+  isAppBundle,
+}) => {
   /**
    * module {
    *   id: number
@@ -84,7 +121,7 @@ const compile = () => {
     const currentId = ++moduleId
     modules[filePath] = {
       id: currentId,
-      code: wrapModule(transformModule(rawModuleCode, filePath)),
+      code: wrapModule(transformModule(rawModuleCode, filePath), filePath),
     }
     return currentId
   }
@@ -92,10 +129,14 @@ const compile = () => {
   const transformModule = (moduleCode, currentPath) => {
     const ast = parser.parse(moduleCode, {
       sourceType: 'module',
+      plugins: ['dynamicImport'],
     })
     const makeExport = (local, exported = 'default') =>
       `__esModuleExports.${exported} = ${local}`
     const makeImport = (local, imported, _moduleId) => {
+      if (imported === '*') {
+        return `var ${local} = __requireESModule(${_moduleId})`
+      }
       return `var ${local} = __requireESModule(${_moduleId}).${imported ||
         'default'}`
     }
@@ -105,6 +146,46 @@ const compile = () => {
     }
 
     traverse(ast, {
+      // find import()
+      ExpressionStatement(path) {
+        path.traverse({
+          CallExpression(path) {
+            path.traverse({
+              MemberExpression(path) {
+                path.traverse({
+                  CallExpression(path) {
+                    if (path.node.callee.type === 'Import') {
+                      path.node.callee.type = 'Identifier'
+                      path.node.callee.name = '__dynamicImport'
+                      const relPath = path.node.arguments[0].value
+                      const absPath = resolveRelPath(
+                        relPath + '.js',
+                        currentPath
+                      )
+                      if (compiledBundles[absPath]) {
+                        path.node.arguments[0].value =
+                          compiledBundles[absPath].publicFilePath
+                        return
+                      }
+                      const publicFilePath = compileBundle({
+                        entry: absPath,
+                        output: {
+                          path: output.path,
+                          publicPath: output.publicPath,
+                        },
+                        onFinishCompilingBundle,
+                        compiledBundles,
+                        isAppBundle: false,
+                      })
+                      path.node.arguments[0].value = publicFilePath
+                    }
+                  },
+                })
+              },
+            })
+          },
+        })
+      },
       ImportDeclaration(path, stats) {
         const relPath = path.node.source.value
         // TODO: ext 处理
@@ -113,6 +194,9 @@ const compile = () => {
         )
         const imports = path.node.specifiers
           .map(s => {
+            if (s.type === 'ImportNamespaceSpecifier') {
+              return makeImport(s.local.name, '*', _moduleId)
+            }
             return makeImport(
               s.local.name,
               s.imported && s.imported.name,
@@ -138,12 +222,24 @@ const compile = () => {
       ExportNamedDeclaration(path, stats) {
         if (path.node.declaration) {
           const { code } = generate(path.node.declaration)
-          const local = path.node.declaration.declarations[0].id.name
-          const exportCode = code + '\n' + makeExport(local, local)
-          replaceWithCode(path, exportCode)
+          const handleDecl = d => {
+            const local = d.id.name
+            return makeExport(local, local)
+          }
+          if (path.node.declaration.type === 'FunctionDeclaration') {
+            replaceWithCode(
+              path,
+              code + '\n' + handleDecl(path.node.declaration)
+            )
+            return
+          }
+          let exportCode = ''
+          path.node.declaration.declarations.forEach(d => {
+            exportCode += handleDecl(d) + '\n'
+          })
+          replaceWithCode(path, code + '\n' + exportCode)
           return
         }
-        // TODO: 这里情况还有这种 export function a() {}
         const _exports = path.node.specifiers
           .map(s => {
             return makeExport(s.local.name, s.exported.name)
@@ -160,7 +256,66 @@ const compile = () => {
 
   resolveImport(entry)
   const finalCode = codeTpl(modules)
-  writeCodeToDisk(path.resolve(output, './bundle.js'), finalCode)
+  const fileHash = md5(finalCode)
+  let publicFilePath
+  let filename
+
+  if (isAppBundle) {
+    // TODO: 处理 hash
+    filename = output.filename || fileHash + '.js'
+    publicFilePath = `${output.publicPath}/${filename}`
+  } else {
+    // dynamic import
+    const {
+      publicFilePath: publicFilePath0,
+      filename: filename0,
+    } = onFinishCompilingBundle(entry)
+    filename = filename0
+    publicFilePath = publicFilePath0
+  }
+  const outputFilePath = path.resolve(output.path, filename)
+
+  if (!fs.existsSync(output.path)) {
+    fs.mkdirSync(output.path)
+  }
+  writeCodeToDisk(outputFilePath, finalCode)
+  console.log(`Bundled ${entry}`)
+  return publicFilePath
+}
+
+const compile = () => {
+  const config = getConfig()
+  let bundleId = 0
+  const { entry, output } = config
+  /**
+   * {
+   *    [entryFilePath: string]: {
+   *        id,
+   *        publicFilePath,
+   *    }
+   * }
+   */
+  const compiledBundles = {}
+  const onFinishCompilingBundle = filePath => {
+    const id = bundleId
+    const filename = `${id}.chunk.js`
+    const publicFilePath = `${output.publicPath}/${filename}`
+    const bundleInfo = {
+      id,
+      publicFilePath,
+      filename,
+    }
+    bundleId++
+    compiledBundles[filePath] = bundleInfo
+    return bundleInfo
+  }
+  compileBundle({
+    entry,
+    output,
+    compiledBundles,
+    onFinishCompilingBundle,
+    isAppBundle: true,
+  })
   console.log('Build complete 🌟')
 }
 
