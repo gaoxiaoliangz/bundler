@@ -1,3 +1,3 @@
-import add from './add'
+import withTag from './withTag'
 
-export { add }
+export { withTag }

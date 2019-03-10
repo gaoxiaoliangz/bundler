@@ -1,18 +1,15 @@
-import showInfo from './showInfo'
+import render from './render'
 import { APP_NAME, APP_DESC } from './const'
+import { withTag } from './utils/index'
+import { runTests } from './tests'
+
+const title = withTag('h1')
+const div = withTag('div')
 
 const app = () => {
-  showInfo([APP_NAME, APP_DESC].join(' - '), 'h1')
-  showInfo('app is running...')
-  import('./lib/remote').then(m => {
-    m.test()
-  })
-  import('./lib/remote').then(m => {
-    m.test()
-  })
-  import('./lib/remote2').then(m => {
-    m.test2()
-  })
+  render(title([APP_NAME, APP_DESC].join(' - ')))
+  render(div('app is running...'))
+  runTests()
 }
 
 app()
