@@ -37,13 +37,35 @@ const codeTpl = modules => {
     .join(',\n')
 
   return `;(function() {
-  function __dynamicImport(url) {
-    return fetch(url).then(res => {
-      return res.text().then(data => {
-        return eval(data)
+  var __dynamicImport = (function() {
+    var cache = {}
+    return function (url) {
+      const hit = cache[url]
+      if (hit) {
+        if(!hit.isFetching) {
+          return Promise.resolve(cache[url].exports)
+        } else {
+          return hit.fetchPromise
+        }
+      }
+      const fetchPromise = fetch(url).then(res => {
+        return res.text().then(data => {
+          const result = eval(data)
+          cache[url] = {
+            exports: result,
+            isFetching: false,
+          }
+          return result
+        })
       })
-    })
-  }
+      cache[url] = {
+        fetchPromise,
+        isFetching: true,
+        exports: null,
+      }
+      return fetchPromise
+    }
+  })()
   return (function(modules) {
     var cache = {}
     function requireESModule(id) {
