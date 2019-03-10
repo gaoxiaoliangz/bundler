@@ -83,10 +83,11 @@ const codeTpl = modules => {
 })()`
 }
 
-const wrapModule = code => {
-  return `function(__requireESModule, __esModuleExports) {
-  ${code}
-}`
+const wrapModule = (code, filePath) => {
+  return `// ${filePath}
+  function(__requireESModule, __esModuleExports) {
+    ${code}
+  }`
 }
 
 const resolveRelPath = (relPath, currentPath) => {
@@ -120,7 +121,7 @@ const compileBundle = ({
     const currentId = ++moduleId
     modules[filePath] = {
       id: currentId,
-      code: wrapModule(transformModule(rawModuleCode, filePath)),
+      code: wrapModule(transformModule(rawModuleCode, filePath), filePath),
     }
     return currentId
   }
@@ -133,6 +134,9 @@ const compileBundle = ({
     const makeExport = (local, exported = 'default') =>
       `__esModuleExports.${exported} = ${local}`
     const makeImport = (local, imported, _moduleId) => {
+      if (imported === '*') {
+        return `var ${local} = __requireESModule(${_moduleId})`
+      }
       return `var ${local} = __requireESModule(${_moduleId}).${imported ||
         'default'}`
     }
@@ -190,6 +194,9 @@ const compileBundle = ({
         )
         const imports = path.node.specifiers
           .map(s => {
+            if (s.type === 'ImportNamespaceSpecifier') {
+              return makeImport(s.local.name, '*', _moduleId)
+            }
             return makeImport(
               s.local.name,
               s.imported && s.imported.name,
