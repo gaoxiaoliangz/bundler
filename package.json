@@ -1,6 +1,6 @@
 {
   "name": "build-my-webpack",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "scripts": {
     "start": "node src/index.js",
     "debug": "node --inspect-brk src/index.js",
