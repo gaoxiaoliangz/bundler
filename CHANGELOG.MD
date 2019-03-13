@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.0
+
+- using typescript
+- fixed some potential bugs by looking at types
+
 ## v0.1.0
 
 - default, named and namespaced import
