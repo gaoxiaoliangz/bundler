@@ -8,9 +8,9 @@
     "nodemon": "nodemon --config nodemon-debug.json"
   },
   "bin": {
-    "mywebpack": "dist/index.js"
+    "mywebpack": "bin/index.js"
   },
-  "main": "index.js",
+  "main": "dist/index.js",
   "repository": "git@github.com:gaoxiaoliangz/build-my-webpack.git",
   "author": "gaoxiaoliangz <gaoxiaoliangz@gmail.com>",
   "license": "MIT",
@@ -19,6 +19,7 @@
     "@babel/generator": "^7.3.4",
     "@babel/parser": "^7.3.4",
     "@babel/traverse": "^7.3.4",
+    "@babel/types": "^7.3.4",
     "esm": "^3.2.11",
     "md5": "^2.2.1"
   },

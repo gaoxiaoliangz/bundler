@@ -7,6 +7,7 @@ const runTests = () => {
   log('testExport', testExport)
 
   // test dynamic import
+  // import(log).then(a => {})
   import('./lib/remote').then(m => {
     m.test()
   })
