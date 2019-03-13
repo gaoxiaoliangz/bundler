@@ -5,7 +5,7 @@ import * as babel from '@babel/core'
 import * as path from 'path'
 import * as fs from 'fs'
 import generate from '@babel/generator'
-import md5 from 'md5'
+import * as md5 from 'md5'
 
 const getConfig = () => {
   const defaultConfigFile = 'mywebpack.config.js'
