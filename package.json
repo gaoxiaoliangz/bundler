@@ -2,14 +2,15 @@
   "name": "build-my-webpack",
   "version": "0.1.0",
   "scripts": {
-    "start": "node src/index.js",
-    "debug": "node --inspect-brk src/index.js",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "debug": "node --inspect-brk dist/index.js",
     "nodemon": "nodemon --config nodemon-debug.json"
   },
   "bin": {
-    "mywebpack": "src/index.js"
+    "mywebpack": "bin/index.js"
   },
-  "main": "index.js",
+  "main": "dist/index.js",
   "repository": "git@github.com:gaoxiaoliangz/build-my-webpack.git",
   "author": "gaoxiaoliangz <gaoxiaoliangz@gmail.com>",
   "license": "MIT",
@@ -18,10 +19,17 @@
     "@babel/generator": "^7.3.4",
     "@babel/parser": "^7.3.4",
     "@babel/traverse": "^7.3.4",
+    "@babel/types": "^7.3.4",
     "esm": "^3.2.11",
     "md5": "^2.2.1"
   },
   "devDependencies": {
-    "nodemon": "^1.18.10"
+    "@types/babel__core": "^7.1.0",
+    "@types/babel__generator": "^7.0.2",
+    "@types/babel__traverse": "^7.0.6",
+    "@types/md5": "^2.1.33",
+    "@types/node": "^11.11.3",
+    "nodemon": "^1.18.10",
+    "typescript": "^3.3.3333"
   }
 }

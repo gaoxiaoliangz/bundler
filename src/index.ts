@@ -5,7 +5,8 @@ import * as babel from '@babel/core'
 import * as path from 'path'
 import * as fs from 'fs'
 import generate from '@babel/generator'
-import md5 from 'md5'
+import * as md5 from 'md5'
+import * as t from '@babel/types'
 
 const getConfig = () => {
   const defaultConfigFile = 'mywebpack.config.js'
@@ -155,16 +156,22 @@ const compileBundle = ({
                 path.traverse({
                   CallExpression(path) {
                     if (path.node.callee.type === 'Import') {
-                      path.node.callee.type = 'Identifier'
-                      path.node.callee.name = '__dynamicImport'
-                      const relPath = path.node.arguments[0].value
+                      if (path.node.arguments[0].type !== 'StringLiteral') {
+                        throw new Error(
+                          'dynamic import only accepts "StringLiteral" as argument'
+                        )
+                      }
+                      const argNode = path.node.arguments[0] as t.StringLiteral
+                      // replace node
+                      const node = t.identifier('__dynamicImport')
+                      path.node.callee = node
+                      const relPath = argNode.value
                       const absPath = resolveRelPath(
                         relPath + '.js',
                         currentPath
                       )
                       if (compiledBundles[absPath]) {
-                        path.node.arguments[0].value =
-                          compiledBundles[absPath].publicFilePath
+                        argNode.value = compiledBundles[absPath].publicFilePath
                         return
                       }
                       const publicFilePath = compileBundle({
@@ -177,7 +184,7 @@ const compileBundle = ({
                         compiledBundles,
                         isAppBundle: false,
                       })
-                      path.node.arguments[0].value = publicFilePath
+                      argNode.value = publicFilePath
                     }
                   },
                 })
@@ -197,9 +204,10 @@ const compileBundle = ({
             if (s.type === 'ImportNamespaceSpecifier') {
               return makeImport(s.local.name, '*', _moduleId)
             }
+            const s2 = s as t.ImportSpecifier
             return makeImport(
-              s.local.name,
-              s.imported && s.imported.name,
+              s2.local.name,
+              s2.imported && s2.imported.name,
               _moduleId
             )
           })
@@ -233,15 +241,19 @@ const compileBundle = ({
             )
             return
           }
+          // VariableDeclaration
           let exportCode = ''
-          path.node.declaration.declarations.forEach(d => {
+          const declaration = path.node.declaration as t.VariableDeclaration
+          declaration.declarations.forEach(d => {
             exportCode += handleDecl(d) + '\n'
           })
           replaceWithCode(path, code + '\n' + exportCode)
+          // TODO: 是否应该 return
           return
         }
+        // TODO: ExportNamespaceSpecifier
         const _exports = path.node.specifiers
-          .map(s => {
+          .map((s: t.ExportSpecifier) => {
             return makeExport(s.local.name, s.exported.name)
           })
           .join(';\n')
