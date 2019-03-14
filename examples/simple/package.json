@@ -5,12 +5,15 @@
     "start": "serve",
     "prebuild": "rimraf dist",
     "build": "mywebpack",
+    "build:webpack": "webpack --config webpack.config.js",
     "debug": "node --inspect-brk ../../dist/index.js"
   },
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
     "rimraf": "^2.6.3",
-    "serve": "^10.1.2"
+    "serve": "^10.1.2",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.2.3"
   }
 }
