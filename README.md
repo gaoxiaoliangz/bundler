@@ -1,4 +1,4 @@
-# my-webpack
+# bundler
 
 ## Motivation
 
